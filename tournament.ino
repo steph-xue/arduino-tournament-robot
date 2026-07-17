@@ -1,5 +1,3 @@
-#include <Servo.h>
-
 // Define sensor input pins
 const int analogInPin1 = A0;  // Left sensor
 const int analogInPin2 = A1;  // Right sensor
@@ -22,10 +20,7 @@ const int echoPinRightSide = 2;
 const int whiteThreshold1 = 460;  // Sensor value indicating a white line
 const int whiteThreshold2 = 350;  // Sensor value indicating a white line
 const int whiteThreshold3 = 350;  // Sensor value indicating a white line
-const int frontSetPoint = 20;  // Distance in cm before turning inside corner
-const int sideSetPoint = 20;   // Ideal distance from the wall
-const float K_p = 5.0;        // Proportional gain for PID correction
-const float K_p_turn = 1;     // Proportional gain for wall-following adjustments
+const int frontSetPoint = 20;     // Distance in cm before turning inside corner
 
 // Variables for distance sensor readings and filtering
 float cmFront = 0;
@@ -40,8 +35,8 @@ float cmLeftSide = 0;
 float prevCmLeftSide = 0;
 float filteredCmLeftSide = 0;
 
-bool lineFollowingMode = true; 
-bool wallFollowingMode = false;  
+bool lineFollowingMode = true;
+bool wallFollowingMode = false;
 bool objectFollowingMode = false;
 
 // Global flag to indicate when the robot has detected an object and should stop permanently
@@ -80,21 +75,22 @@ void loop() {
   filteredCmRightSide = (cmRightSide + prevCmRightSide) / 2;
   filteredCmLeftSide = (cmLeftSide + prevCmLeftSide) / 2;
 
-  Serial.print("Ls: "); 
+  Serial.print("Ls: ");
   Serial.print(sensorLeft);
-  Serial.print(" | Rs: "); 
+  Serial.print(" | Rs: ");
   Serial.print(sensorRight);
-  Serial.print(" | Fd: "); 
+  Serial.print(" | Fd: ");
   Serial.print(filteredCmFront);
-  Serial.print(" | Ld "); 
+  Serial.print(" | Ld: ");
   Serial.print(filteredCmLeftSide);
-  Serial.print(" | Rd: "); 
+  Serial.print(" | Rd: ");
   Serial.println(filteredCmRightSide);
 
- // **Mode Switching Logic**
+  // Mode Switching Logic
   if (lineFollowingMode) {
-    // **Switch to wall following if a wall is detected**
-    if ((filteredCmLeftSide < 20 || filteredCmRightSide < 20 || filteredCmFront < 20) && (filteredCmLeftSide != 0 && filteredCmRightSide != 0 && filteredCmFront != 0)) {
+    // Switch to wall following if a wall is detected
+    if ((filteredCmLeftSide < 20 || filteredCmRightSide < 20 || filteredCmFront < 20) &&
+        (filteredCmLeftSide != 0 && filteredCmRightSide != 0 && filteredCmFront != 0)) {
       Serial.println("Wall detected! Switching to Wall Following Mode...");
       moveForwardStartLine();
       wallFollowingMode = true;
@@ -103,9 +99,9 @@ void loop() {
     } else {
       followLine(sensorLeft, sensorRight);
     }
-  } 
+  }
   else if (wallFollowingMode) {
-    // **Switch to object following if white line is detected**
+    // Switch to object following if white line is detected
     if (sensorLeft > whiteThreshold2 && sensorRight > whiteThreshold2) {
       Serial.println("White line detected! Switching to Object Following Mode...");
       moveForwardStart1();
@@ -118,17 +114,16 @@ void loop() {
     } else {
       followWall(filteredCmFront, filteredCmLeftSide, filteredCmRightSide);
     }
-  } 
+  }
   else if (objectFollowingMode) {
     followObject(filteredCmFront, filteredCmLeftSide, filteredCmRightSide, sensorLeft, sensorRight);
   }
-
 
   // Save current sensor values for the next iteration (for filtering)
   prevCmFront = cmFront;
   prevCmRightSide = cmRightSide;
   prevCmLeftSide = cmLeftSide;
-  
+
   delay(300);
 }
 
@@ -139,11 +134,11 @@ void followLine(int sensorLeft, int sensorRight) {
     Serial.println("Moving forward");
     driveForwardLine();
   } else if (sensorLeft > sensorRight + 10) {
-    // Left sensor on white, right sensor on black: turn left 
+    // Left sensor on white, right sensor on black: turn left
     Serial.println("Turning left");
     turnLeftLine();
   } else if (sensorLeft + 10 < sensorRight) {
-    // Right sensor on white, left sensor on black: turn right 
+    // Right sensor on white, left sensor on black: turn right
     Serial.println("Turning right");
     turnRightLine();
   } else {
@@ -154,32 +149,31 @@ void followLine(int sensorLeft, int sensorRight) {
 }
 
 void followWall(float cmFront, float cmLeftSide, float cmRightSide) {
-
-  // **Wall Following (ePID-based wheel adjustments)**
-    if ((cmLeftSide < 50 && cmFront > frontSetPoint) && cmFront < 800) { 
-        Serial.println("Following wall...");
-        moveForwardWall(255, 255);
+  // Wall following based on fixed-speed driving with corner detection
+  if ((cmLeftSide < 50 && cmFront > frontSetPoint) && cmFront < 800) {
+    Serial.println("Following wall...");
+    moveForwardWall(255, 255);
+  }
+  // Corner Detection: turn toward whichever side has more room
+  else if ((cmFront < frontSetPoint || cmFront > 800)) {
+    if (cmRightSide >= cmLeftSide) {
+      stopRobot();
+      Serial.println("Corner Detected! Turning Right...");
+      forwardWall();
+      backwardWall();
+      turnRightWall();
+    } else {
+      stopRobot();
+      Serial.println("Corner Detected! Turning Left...");
+      backwardWall();
+      turnLeftWall();
     }
-    // ** Corner Detection → Turn Right**
-    else if ((cmFront < frontSetPoint || cmFront > 800)) {
-      if (cmRightSide >= cmLeftSide) {
-        stopRobot();
-        Serial.println("Corner Detected! Turning Right...");
-        forwardWall();
-        backwardWall();
-        turnRightWall();
-      } else {
-        stopRobot();
-        Serial.println("Corner Detected! Turning Left...");
-        backwardWall();
-        turnLeftWall();
-      }
-    }
-    else {
-      // Last case if nothing in front or on the side
-        Serial.println("Moving forward");
-        moveForwardWall(255, 255);
-    }
+  }
+  else {
+    // Last case if nothing in front or on the side
+    Serial.println("Moving forward");
+    moveForwardWall(255, 255);
+  }
 }
 
 void followObject(float objectFrontDistance, float objectLeftSideDistance, float objectRightSideDistance, int sensorLeft, int sensorRight) {
@@ -192,7 +186,7 @@ void followObject(float objectFrontDistance, float objectLeftSideDistance, float
     return;
   }
 
- // ** Object detected in front → STOP PERMANENTLY**
+  // Object detected in front: STOP PERMANENTLY
   if (objectFrontDistance > 0 && objectFrontDistance <= 5) {
     Serial.println("Object found. Stopping permanently...");
     stopRobot();
@@ -203,9 +197,9 @@ void followObject(float objectFrontDistance, float objectLeftSideDistance, float
     Serial.println("Object detected in front! Moving towards it...");
     moveForwardObject(150, 150);
     return;
-  } 
+  }
 
-  // ** Object detected on the left side → Rotate until it is in front**
+  // Object detected on the left side: rotate until it is in front
   if (objectLeftSideDistance > 0 && objectLeftSideDistance <= 50) {
     Serial.println("Object detected on the left side! Rotating left to face it...");
     turnLeft();
@@ -213,7 +207,7 @@ void followObject(float objectFrontDistance, float objectLeftSideDistance, float
     return;
   }
 
-  // ** Object detected on the left side → Rotate until it is in front**
+  // Object detected on the right side: rotate until it is in front
   if (objectRightSideDistance > 0 && objectRightSideDistance <= 50) {
     Serial.println("Object detected on the right side! Rotating right to face it...");
     turnRight();
@@ -221,11 +215,11 @@ void followObject(float objectFrontDistance, float objectLeftSideDistance, float
     return;
   }
 
-  // **3No object detected → Begin 360° search sweep**
+  // No object detected: begin 360° search sweep
   moveForwardSearch();
-  Serial.println("No object detected. Starting 360° sweep...");
+  Serial.println("No object detected. Starting 360 degree sweep...");
 
-  for (int i = 0; i < 13; i++) { // 18 steps of 20° each = 360°
+  for (int i = 0; i < 13; i++) { // 13 steps to complete a full rotation
     turnLeftSmall();
     delay(200);
     stopRobot();
@@ -239,7 +233,7 @@ void followObject(float objectFrontDistance, float objectLeftSideDistance, float
     Serial.print("| Front: ");
     Serial.print(objectFrontDistance);
     Serial.print(" cm | Left: ");
-    Serial.println(objectLeftSideDistance);
+    Serial.print(objectLeftSideDistance);
     Serial.print(" cm | Right: ");
     Serial.println(objectRightSideDistance);
 
@@ -270,10 +264,8 @@ void followObject(float objectFrontDistance, float objectLeftSideDistance, float
       return;
     }
   }
-  Serial.println("360° Sweep completed. No object found.");
-  return;
+  Serial.println("360 degree sweep completed. No object found.");
 }
-
 
 float getDistance(int trig, int echo) {
   digitalWrite(trig, LOW);
@@ -295,7 +287,7 @@ void driveForwardLine() {
   stopRobot();
 }
 
-// Function to turn slightly 
+// Function to turn slightly
 void turnLeftLine() {
   analogWrite(motorAPin_A, 150);
   analogWrite(motorAPin_B, 150);
@@ -305,7 +297,7 @@ void turnLeftLine() {
   stopRobot();
 }
 
-// Function to turn slightly 
+// Function to turn slightly
 void turnRightLine() {
   analogWrite(motorAPin_A, 0);
   analogWrite(motorAPin_B, 150);
@@ -329,107 +321,72 @@ void searchForLine(int sensorLeft, int sensorRight) {
   if (sensorLeft > sensorRight) {
     turnLeftLine();
     delay(100); // Small left turn
-      if (sensorLeft > whiteThreshold1 || sensorRight > whiteThreshold1) {
-          return; // Found the line
-      }
+    if (sensorLeft > whiteThreshold1 || sensorRight > whiteThreshold1) {
+      return; // Found the line
+    }
   } else if (sensorLeft < sensorRight) {
     turnRightLine();
     delay(100);
-        if (sensorLeft > whiteThreshold1 || sensorRight > whiteThreshold1) {
-          return; // Found the line
-        }         
+    if (sensorLeft > whiteThreshold1 || sensorRight > whiteThreshold1) {
+      return; // Found the line
+    }
   }
 }
 
 void moveForwardStartLine() {
-    analogWrite(motorAPin_A, 0);
-    analogWrite(motorAPin_B, 255);
-    analogWrite(motorBPin_A, 255);
-    analogWrite(motorBPin_B, 0);
-    delay(1000);
-    stopRobot();
+  analogWrite(motorAPin_A, 0);
+  analogWrite(motorAPin_B, 255);
+  analogWrite(motorBPin_A, 255);
+  analogWrite(motorBPin_B, 0);
+  delay(1000);
+  stopRobot();
 }
 
-/*
-
-void searchForLine(int sensorLeft, int sensorRight) {
-
-  if (sensorLeft > sensorRight) {
-    turnLeftLine();
-    delay(100); // Small left turn
-      if (sensorLeft > whiteThreshold || sensorRight > whiteThreshold) {
-          return; // Found the line
-      }
-  } else if (sensorLeft < sensorRight) {
-    turnRightLine();
-    delay(100);
-        if (sensorLeft > whiteThreshold || sensorRight > whiteThreshold) {
-          return; // Found the line
-        }         
-  }
-}
-    // If not found, try turning right
-    for (int i = 0; i < 20; i++) { // Turn right more since we turned left first
-        turnRightLine();
-        delay(100);
-        if (analogRead(sensorLeft) > whiteThreshold || analogRead(sensorRight) > whiteThreshold) {
-            return; // Found the line
-        }
-    }
-
-    // If still not found, move backward slightly and retry
-    moveBackLine();
-    delay(200);
-    searchForLine(sensorLeft, sensorRight); // Retry
-*/
-
-
-// **Smooth Forward Motion with Differential Speed**
+// Smooth forward motion with differential speed
 void moveForwardWall(int leftSpeed, int rightSpeed) {
-    analogWrite(motorAPin_A, 0);
-    analogWrite(motorAPin_B, leftSpeed);
-    analogWrite(motorBPin_A, rightSpeed);
-    analogWrite(motorBPin_B, 0);
-    delay(400);
-    stopRobot();
+  analogWrite(motorAPin_A, 0);
+  analogWrite(motorAPin_B, leftSpeed);
+  analogWrite(motorBPin_A, rightSpeed);
+  analogWrite(motorBPin_B, 0);
+  delay(400);
+  stopRobot();
 }
 
-// **Turn Right (Outside Corner)**
+// Turn right (outside corner)
 void turnRightWall() {
-    analogWrite(motorAPin_A, 0);
-    analogWrite(motorAPin_B, 255);
-    analogWrite(motorBPin_A, 255);
-    analogWrite(motorBPin_B, 255);
-    delay(200); // Adjust based on testing
-
+  analogWrite(motorAPin_A, 0);
+  analogWrite(motorAPin_B, 255);
+  analogWrite(motorBPin_A, 255);
+  analogWrite(motorBPin_B, 255);
+  delay(200); // Adjust based on testing
 }
 
-// **Turn Left (Inside Corner)**
+// Turn left (inside corner)
 void turnLeftWall() {
-    analogWrite(motorAPin_A, 255);
-    analogWrite(motorAPin_B, 255);
-    analogWrite(motorBPin_A, 255);
-    analogWrite(motorBPin_B, 0);
-    delay(500); // Adjust based on testing
-    stopRobot();
+  analogWrite(motorAPin_A, 255);
+  analogWrite(motorAPin_B, 255);
+  analogWrite(motorBPin_A, 255);
+  analogWrite(motorBPin_B, 0);
+  delay(500); // Adjust based on testing
+  stopRobot();
 }
 
 void backwardWall() {
-    analogWrite(motorAPin_A, 255);
-    analogWrite(motorAPin_B, 0);
-    analogWrite(motorBPin_A, 0);  
-    analogWrite(motorBPin_B, 255); 
-    delay(300); // Adjust based on testing
-    stopRobot();
+  analogWrite(motorAPin_A, 255);
+  analogWrite(motorAPin_B, 0);
+  analogWrite(motorBPin_A, 0);
+  analogWrite(motorBPin_B, 255);
+  delay(300); // Adjust based on testing
+  stopRobot();
 }
 
 void forwardWall() {
-    analogWrite(motorAPin_A, 0);
-    analogWrite(motorAPin_B, 255);
-    analogWrite(motorBPin_A, 255);  
-    analogWrite(motorBPin_B, 0); 
-    delay(300); // Adjust based on testing
-    stopRobot();
+  analogWrite(motorAPin_A, 0);
+  analogWrite(motorAPin_B, 255);
+  analogWrite(motorBPin_A, 255);
+  analogWrite(motorBPin_B, 0);
+  delay(300); // Adjust based on testing
+  stopRobot();
 }
 
 void stopRobot() {
@@ -439,92 +396,89 @@ void stopRobot() {
   analogWrite(motorBPin_B, 255);
 }
 
-// **Smooth Forward Motion with Differential Speed**
+// Smooth forward motion with differential speed
 void moveForwardStart1() {
-    analogWrite(motorAPin_A, 0);
-    analogWrite(motorAPin_B, 255);
-    analogWrite(motorBPin_A, 255);
-    analogWrite(motorBPin_B, 0);
-    delay(1400);
-    stopRobot();
+  analogWrite(motorAPin_A, 0);
+  analogWrite(motorAPin_B, 255);
+  analogWrite(motorBPin_A, 255);
+  analogWrite(motorBPin_B, 0);
+  delay(1400);
+  stopRobot();
 }
 
-// **Smooth Forward Motion with Differential Speed**
+// Smooth forward motion with differential speed
 void moveCurveStart() {
-    analogWrite(motorAPin_A, 255);
-    analogWrite(motorAPin_B, 255);
-    analogWrite(motorBPin_A, 255);
-    analogWrite(motorBPin_B, 0);
-    delay(100);
-    stopRobot();
+  analogWrite(motorAPin_A, 255);
+  analogWrite(motorAPin_B, 255);
+  analogWrite(motorBPin_A, 255);
+  analogWrite(motorBPin_B, 0);
+  delay(100);
+  stopRobot();
 }
 
 void moveForwardStart2() {
-    analogWrite(motorAPin_A, 0);
-    analogWrite(motorAPin_B, 255);
-    analogWrite(motorBPin_A, 255);
-    analogWrite(motorBPin_B, 0);
-    delay(1500);
-    stopRobot();
+  analogWrite(motorAPin_A, 0);
+  analogWrite(motorAPin_B, 255);
+  analogWrite(motorBPin_A, 255);
+  analogWrite(motorBPin_B, 0);
+  delay(1500);
+  stopRobot();
 }
 
-// **Smooth Forward Motion with Differential Speed**
+// Smooth forward motion with differential speed
 void moveForwardSearch() {
-    analogWrite(motorAPin_A, 0);
-    analogWrite(motorAPin_B, 255);
-    analogWrite(motorBPin_A, 255);
-    analogWrite(motorBPin_B, 0);
-    delay(500);
-    stopRobot();
+  analogWrite(motorAPin_A, 0);
+  analogWrite(motorAPin_B, 255);
+  analogWrite(motorBPin_A, 255);
+  analogWrite(motorBPin_B, 0);
+  delay(500);
+  stopRobot();
 }
 
-// **Smooth Forward Motion with Differential Speed**
+// Smooth forward motion with differential speed
 void moveForwardObject(int leftSpeed, int rightSpeed) {
-    analogWrite(motorAPin_A, 0);
-    analogWrite(motorAPin_B, leftSpeed);
-    analogWrite(motorBPin_A, rightSpeed);
-    analogWrite(motorBPin_B, 0);
-    delay(300);
-    stopRobot();
+  analogWrite(motorAPin_A, 0);
+  analogWrite(motorAPin_B, leftSpeed);
+  analogWrite(motorBPin_A, rightSpeed);
+  analogWrite(motorBPin_B, 0);
+  delay(300);
+  stopRobot();
 }
 
-
-// **Turn Left
 void turnLeft() {
-    analogWrite(motorAPin_A, 255);
-    analogWrite(motorAPin_B, 255);
-    analogWrite(motorBPin_A, 255);
-    analogWrite(motorBPin_B, 0);
-    delay(600); 
-    stopRobot();
+  analogWrite(motorAPin_A, 255);
+  analogWrite(motorAPin_B, 255);
+  analogWrite(motorBPin_A, 255);
+  analogWrite(motorBPin_B, 0);
+  delay(600);
+  stopRobot();
 }
 
-// **Turn Right
 void turnRight() {
-    analogWrite(motorAPin_A, 0);
-    analogWrite(motorAPin_B, 255);
-    analogWrite(motorBPin_A, 255);
-    analogWrite(motorBPin_B, 255);
-    delay(600); 
-    stopRobot();
+  analogWrite(motorAPin_A, 0);
+  analogWrite(motorAPin_B, 255);
+  analogWrite(motorBPin_A, 255);
+  analogWrite(motorBPin_B, 255);
+  delay(600);
+  stopRobot();
 }
 
 void turnLeftSearch() {
-    analogWrite(motorAPin_A, 255);
-    analogWrite(motorAPin_B, 255);
-    analogWrite(motorBPin_A, 255);
-    analogWrite(motorBPin_B, 0);
-    delay(500); 
-    stopRobot();
+  analogWrite(motorAPin_A, 255);
+  analogWrite(motorAPin_B, 255);
+  analogWrite(motorBPin_A, 255);
+  analogWrite(motorBPin_B, 0);
+  delay(500);
+  stopRobot();
 }
 
 void turnRightSearch() {
-    analogWrite(motorAPin_A, 0);
-    analogWrite(motorAPin_B, 255);
-    analogWrite(motorBPin_A, 255);
-    analogWrite(motorBPin_B, 255);
-    delay(500); 
-    stopRobot();
+  analogWrite(motorAPin_A, 0);
+  analogWrite(motorAPin_B, 255);
+  analogWrite(motorBPin_A, 255);
+  analogWrite(motorBPin_B, 255);
+  delay(500);
+  stopRobot();
 }
 
 void turnLeftSmall() {
@@ -532,16 +486,15 @@ void turnLeftSmall() {
   analogWrite(motorAPin_B, 255);
   analogWrite(motorBPin_A, 255);
   analogWrite(motorBPin_B, 0);
-  delay(200); 
+  delay(200);
   stopRobot();
 }
 
 void backward() {
-    analogWrite(motorAPin_A, 255);
-    analogWrite(motorAPin_B, 0);
-    analogWrite(motorBPin_A, 0);  
-    analogWrite(motorBPin_B, 255); 
-    delay(300); 
-    stopRobot();
+  analogWrite(motorAPin_A, 255);
+  analogWrite(motorAPin_B, 0);
+  analogWrite(motorBPin_A, 0);
+  analogWrite(motorBPin_B, 255);
+  delay(300);
+  stopRobot();
 }
-
