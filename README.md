@@ -1,8 +1,8 @@
 <h1 align="center">Arduino Tournament Robot</h1>
 
 <h4 align="center">
-  An autonomous Arduino robot designed to navigate <br>
-  a tournament maze with line, wall, and object detection capabilities.
+  An autonomous Arduino robot designed to navigate a tournament maze <br>
+  with line, wall, and object detection capabilities.
 </h4>
 
 <p align="center"><img src="images/robot.jpeg" width="300"></p>
