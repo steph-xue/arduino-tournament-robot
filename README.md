@@ -1,9 +1,6 @@
 <h1 align="center">Arduino Tournament Robot</h1>
 
-<h4 align="center">
-  An autonomous Arduino robot designed to navigate a tournament maze <br>
-  with line, wall, and object detection capabilities.
-</h4>
+<h4 align="center">An autonomous Arduino robot designed to navigate a tournament maze with line, wall, and object detection capabilities.</h4>
 
 <p align="center"><img src="images/robot.jpeg" width="300"></p>
 
@@ -79,6 +76,7 @@ Depending on which mode is active, the robot then hands these filtered readings 
 <br>
 
 ## Future Improvements
-- Replace the fixed speed wall following logic with a proportional or full PID controller, using the distance error from the wall to continuously adjust motor speed rather than switching between fixed speeds
-- Add more sensors or upgrade to higher quality infrared sensors for more precise and consistent line and distance detection
 - Add a calibration routine at startup to automatically tune the white line thresholds to the current lighting conditions instead of using fixed values
+- Add more sensors or upgrade to higher quality infrared distance sensors for more precise wall and object detection
+- Replace the three fixed ultrasonic sensors with a single rotating ultrasonic sensor mounted on a servo for a continuous 360 degree sweep
+- Add wireless data logging over Bluetooth or WiFi to stream sensor readings in real time instead of relying on the Serial Monitor over USB
