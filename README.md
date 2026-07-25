@@ -5,7 +5,7 @@
   with line, wall, and object detection capabilities.
 </h4>
 
-<p align="center"><img src="images/robot.jpeg" width="300"></p>
+<p align="center"><img src="docs/images/robot.jpeg" width="300"></p>
 
 ## Contributors
 - Eno Chen
