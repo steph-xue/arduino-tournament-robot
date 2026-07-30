@@ -8,7 +8,7 @@ const int motorAPin_B = 9;   // Motor A speed
 const int motorBPin_A = 4;   // Motor B direction
 const int motorBPin_B = 5;   // Motor B speed
 
-// Ultrasonic Sensor Pins
+// Ultrasonic sensor pins
 const int trigPinFront = 10;
 const int echoPinFront = 11;
 const int trigPinLeftSide = 6;
@@ -42,6 +42,7 @@ bool objectFollowingMode = false;
 // Global flag to indicate when the robot has detected an object and should stop permanently
 bool objectDetected = false;
 
+// Initialize serial communication and configure motor and sensor pins
 void setup() {
   Serial.begin(9600);
   pinMode(motorAPin_A, OUTPUT);
@@ -56,6 +57,7 @@ void setup() {
   pinMode(echoPinLeftSide, INPUT);
 }
 
+// Main loop: read sensors, apply filtering, and run the active mode's behavior
 void loop() {
 
   if (objectDetected) {
@@ -86,7 +88,7 @@ void loop() {
   Serial.print(" | Rd: ");
   Serial.println(filteredCmRightSide);
 
-  // Mode Switching Logic
+  // Mode switching logic
   if (lineFollowingMode) {
     // Switch to wall following if a wall is detected
     if ((filteredCmLeftSide < 20 || filteredCmRightSide < 20 || filteredCmFront < 20) &&
@@ -127,6 +129,7 @@ void loop() {
   delay(300);
 }
 
+// Drive, turn, or search based on the left and right line sensor readings
 void followLine(int sensorLeft, int sensorRight) {
   // Determine movement based on sensor readings
   if (sensorLeft > whiteThreshold1 && sensorRight > whiteThreshold1) {
@@ -148,13 +151,13 @@ void followLine(int sensorLeft, int sensorRight) {
   }
 }
 
+// Follow the wall at fixed speed and turn at corners based on distance readings
 void followWall(float cmFront, float cmLeftSide, float cmRightSide) {
-  // Wall following based on fixed-speed driving with corner detection
   if ((cmLeftSide < 50 && cmFront > frontSetPoint) && cmFront < 800) {
     Serial.println("Following wall...");
     moveForwardWall(255, 255);
   }
-  // Corner Detection: turn toward whichever side has more room
+  // Corner detection: turn toward whichever side has more room
   else if ((cmFront < frontSetPoint || cmFront > 800)) {
     if (cmRightSide >= cmLeftSide) {
       stopRobot();
@@ -176,6 +179,7 @@ void followWall(float cmFront, float cmLeftSide, float cmRightSide) {
   }
 }
 
+// Locate and approach the target object, sweeping to search if nothing is in range
 void followObject(float objectFrontDistance, float objectLeftSideDistance, float objectRightSideDistance, int sensorLeft, int sensorRight) {
 
   if (sensorLeft > whiteThreshold3 || sensorRight > whiteThreshold3) {
@@ -186,11 +190,11 @@ void followObject(float objectFrontDistance, float objectLeftSideDistance, float
     return;
   }
 
-  // Object detected in front: STOP PERMANENTLY
+  // Object detected in front: stop permanently
   if (objectFrontDistance > 0 && objectFrontDistance <= 5) {
     Serial.println("Object found. Stopping permanently...");
     stopRobot();
-    objectDetected = true; // Set flag to prevent further movement
+    objectDetected = true;  // Set flag to prevent further movement
     return;
   }
   if (objectFrontDistance > 0 && objectFrontDistance <= 50) {
@@ -267,6 +271,7 @@ void followObject(float objectFrontDistance, float objectLeftSideDistance, float
   Serial.println("360 degree sweep completed. No object found.");
 }
 
+// Trigger an ultrasonic pulse and return the measured distance in centimeters
 float getDistance(int trig, int echo) {
   digitalWrite(trig, LOW);
   delayMicroseconds(10);
@@ -287,7 +292,7 @@ void driveForwardLine() {
   stopRobot();
 }
 
-// Function to turn slightly
+// Turn left slightly to steer back onto the line
 void turnLeftLine() {
   analogWrite(motorAPin_A, 150);
   analogWrite(motorAPin_B, 150);
@@ -297,7 +302,7 @@ void turnLeftLine() {
   stopRobot();
 }
 
-// Function to turn slightly
+// Turn right slightly to steer back onto the line
 void turnRightLine() {
   analogWrite(motorAPin_A, 0);
   analogWrite(motorAPin_B, 150);
@@ -333,6 +338,7 @@ void searchForLine(int sensorLeft, int sensorRight) {
   }
 }
 
+// Drive forward to clear the end of the taped line before entering the wall maze
 void moveForwardStartLine() {
   analogWrite(motorAPin_A, 0);
   analogWrite(motorAPin_B, 255);
@@ -371,6 +377,7 @@ void turnLeftWall() {
   stopRobot();
 }
 
+// Reverse briefly before turning at a corner
 void backwardWall() {
   analogWrite(motorAPin_A, 255);
   analogWrite(motorAPin_B, 0);
@@ -380,6 +387,7 @@ void backwardWall() {
   stopRobot();
 }
 
+// Move forward briefly before turning at a corner
 void forwardWall() {
   analogWrite(motorAPin_A, 0);
   analogWrite(motorAPin_B, 255);
@@ -389,6 +397,7 @@ void forwardWall() {
   stopRobot();
 }
 
+// Stop both motors
 void stopRobot() {
   analogWrite(motorAPin_A, 255);
   analogWrite(motorAPin_B, 255);
@@ -396,7 +405,7 @@ void stopRobot() {
   analogWrite(motorBPin_B, 255);
 }
 
-// Smooth forward motion with differential speed
+// Drive forward at fixed speed as the first step of the transition into object following mode
 void moveForwardStart1() {
   analogWrite(motorAPin_A, 0);
   analogWrite(motorAPin_B, 255);
@@ -406,7 +415,7 @@ void moveForwardStart1() {
   stopRobot();
 }
 
-// Smooth forward motion with differential speed
+// Curve toward the object detection arena as the second step of the transition into object following mode
 void moveCurveStart() {
   analogWrite(motorAPin_A, 255);
   analogWrite(motorAPin_B, 255);
@@ -416,6 +425,7 @@ void moveCurveStart() {
   stopRobot();
 }
 
+// Drive forward at fixed speed as the final step of the transition into object following mode
 void moveForwardStart2() {
   analogWrite(motorAPin_A, 0);
   analogWrite(motorAPin_B, 255);
@@ -425,7 +435,7 @@ void moveForwardStart2() {
   stopRobot();
 }
 
-// Smooth forward motion with differential speed
+// Drive forward at fixed speed into the arena before starting the search sweep
 void moveForwardSearch() {
   analogWrite(motorAPin_A, 0);
   analogWrite(motorAPin_B, 255);
@@ -445,6 +455,7 @@ void moveForwardObject(int leftSpeed, int rightSpeed) {
   stopRobot();
 }
 
+// Rotate left to face a detected object
 void turnLeft() {
   analogWrite(motorAPin_A, 255);
   analogWrite(motorAPin_B, 255);
@@ -454,6 +465,7 @@ void turnLeft() {
   stopRobot();
 }
 
+// Rotate right to face a detected object
 void turnRight() {
   analogWrite(motorAPin_A, 0);
   analogWrite(motorAPin_B, 255);
@@ -463,6 +475,7 @@ void turnRight() {
   stopRobot();
 }
 
+// Align left toward an object found during the search sweep
 void turnLeftSearch() {
   analogWrite(motorAPin_A, 255);
   analogWrite(motorAPin_B, 255);
@@ -472,6 +485,7 @@ void turnLeftSearch() {
   stopRobot();
 }
 
+// Align right toward an object found during the search sweep
 void turnRightSearch() {
   analogWrite(motorAPin_A, 0);
   analogWrite(motorAPin_B, 255);
@@ -481,6 +495,7 @@ void turnRightSearch() {
   stopRobot();
 }
 
+// Rotate left by a small increment during the 360 degree search sweep
 void turnLeftSmall() {
   analogWrite(motorAPin_A, 255);
   analogWrite(motorAPin_B, 255);
@@ -490,6 +505,7 @@ void turnLeftSmall() {
   stopRobot();
 }
 
+// Reverse away from the arena boundary line
 void backward() {
   analogWrite(motorAPin_A, 255);
   analogWrite(motorAPin_B, 0);
